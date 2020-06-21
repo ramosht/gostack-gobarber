@@ -1,37 +1,40 @@
-import { getRepository } from 'typeorm';
 import { hash } from 'bcryptjs';
-import AppError from '@shared/errors/AppError';
-import Users from '@modules/users/infra/typeorm/entities/Users';
+import { inject, injectable } from 'tsyringe';
 
-interface Request {
+import AppError from '@shared/errors/AppError';
+import IUsersRepository from '@modules/users/repositories/IUsersRepository';
+
+import User from '@modules/users/infra/typeorm/entities/Users';
+
+interface IRequest {
   name: string;
   email: string;
   password: string;
 }
 
+@injectable()
 class CreateUserService {
-  public async execute({ name, email, password }: Request): Promise<Users> {
-    const usersRepository = getRepository(Users);
+  constructor(
+    @inject('UsersRepository')
+    private usersRepository: IUsersRepository,
+  ) {}
 
-    // Verifica se email não é duplicado
-    const emailIsDuplicated = await usersRepository.findOne({ email });
+  public async execute({ name, email, password }: IRequest): Promise<User> {
+    const emailExist = await this.usersRepository.findByEmail(email);
 
-    if (emailIsDuplicated) {
+    if (emailExist) {
       throw new AppError('Esse e-mail já existe.');
-    } else {
-      const hashedPassword = await hash(password, 6);
-
-      const user = usersRepository.create({
-        name,
-        email,
-        password: hashedPassword,
-      });
-      await usersRepository.save(user);
-
-      delete user.password;
-
-      return user;
     }
+
+    const hashedPassword = await hash(password, 6);
+
+    const user = await this.usersRepository.create({
+      name,
+      email,
+      password: hashedPassword,
+    });
+
+    return user;
   }
 }
 

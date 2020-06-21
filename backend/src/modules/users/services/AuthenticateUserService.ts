@@ -1,28 +1,33 @@
-import { getRepository } from 'typeorm';
 import { compare } from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
 import authConfig from '@config/auth';
+import { inject, injectable } from 'tsyringe';
 
 import Users from '@modules/users/infra/typeorm/entities/Users';
 
 import AppError from '@shared/errors/AppError';
+import IUsersRepository from '@modules/users/repositories/IUsersRepository';
 
-interface Request {
+interface IRequest {
   email: string;
   password: string;
 }
 
-interface Reponse {
+interface IReponse {
   user: Users;
   token: string;
 }
 
+@injectable()
 class AuthenticateUserService {
-  public async execute({ email, password }: Request): Promise<Reponse> {
-    const usersRepository = getRepository(Users);
+  constructor(
+    @inject('UsersRepository')
+    private usersRepository: IUsersRepository,
+  ) {}
 
+  public async execute({ email, password }: IRequest): Promise<IReponse> {
     // Verifica se usuário existe
-    const user = await usersRepository.findOne({ where: { email } });
+    const user = await this.usersRepository.findByEmail(email);
 
     if (!user) {
       throw new AppError('O usuário ou a senha incorretos.', 401);
@@ -37,9 +42,7 @@ class AuthenticateUserService {
 
     // usuário autenticado
     delete user.password;
-
     const { secret, expiresIn } = authConfig.jwt;
-
     const token = sign({}, secret, {
       subject: user.id,
       expiresIn,
