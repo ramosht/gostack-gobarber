@@ -1,4 +1,3 @@
-import { compare } from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
 import authConfig from '@config/auth';
 import { inject, injectable } from 'tsyringe';
@@ -7,6 +6,7 @@ import Users from '@modules/users/infra/typeorm/entities/Users';
 
 import AppError from '@shared/errors/AppError';
 import IUsersRepository from '@modules/users/repositories/IUsersRepository';
+import IHashProvider from '@modules/users/providers/models/IHashProvider';
 
 interface IRequest {
   email: string;
@@ -23,6 +23,9 @@ class AuthenticateUserService {
   constructor(
     @inject('UsersRepository')
     private usersRepository: IUsersRepository,
+
+    @inject('HashProvider')
+    private hashProvider: IHashProvider,
   ) {}
 
   public async execute({ email, password }: IRequest): Promise<IReponse> {
@@ -34,7 +37,10 @@ class AuthenticateUserService {
     }
 
     // Verifica se a senha combina
-    const doesPasswordMatch = await compare(password, user.password);
+    const doesPasswordMatch = await this.hashProvider.compareHash(
+      password,
+      user.password,
+    );
 
     if (!doesPasswordMatch) {
       throw new AppError('O usuário ou a senha incorretos.', 401);
